@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Download Simulation + Hidden Video Loop</title>
+  <style>
+    :root{--bg:#071022;--card:#0b1220;--accent:#06b6d4;--muted:#9aa7b2;--white:#fff}
+    body{background:var(--bg);color:var(--white);font-family:Inter,system-ui,Segoe UI,Roboto,Arial;margin:0;padding:28px;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .box{width:100%;max-width:820px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:22px;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.6)}
+    h1{margin:0 0 8px;font-size:20px}
+    p.lead{margin:0 0 16px;color:var(--muted)}
+    .controls{display:flex;gap:12px;align-items:center}
+    .btn{background:linear-gradient(90deg,var(--accent),#06b6d4);border:0;padding:12px 18px;border-radius:10px;color:#001;cursor:pointer;font-weight:700}
+    .small{font-size:13px;color:var(--muted)}
+    /* Progress */
+    .progress-wrap{margin-top:18px}
+    .progress-bar{width:100%;height:14px;background:rgba(255,255,255,0.06);border-radius:8px;overflow:hidden}
+    .progress-fill{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#16a34a);transition:width 0.3s linear}
+    .percent{margin-top:8px;font-weight:700}
+    /* Hidden player container */
+    #ytPlayer { width:0;height:0;visibility:hidden;position:absolute;left:-9999px;top:-9999px; }
+    footer{margin-top:16px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="box" role="main" aria-label="Download simulation and hidden video player">
+    <h1>Movie Download Simulation</h1>
+    <p class="lead">Click <strong>Download Video</strong> to start the download simulation. The video will start playing (hidden) and the simulation will run for 5 minutes. Do not close the page until it finishes.</p>
+
+    <div class="controls">
+      <button id="startBtn" class="btn" aria-haspopup="true">Download Video</button>
+      <div class="small" id="statusText">Ready</div>
+    </div>
+
+    <div class="progress-wrap" aria-hidden="false">
+      <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+      <div class="percent" id="percentText">0% — 5:00 remaining</div>
+    </div>
+
+    <footer>Hidden player used to avoid embed restrictions. Videos play in order and loop automatically.</footer>
+  </div>
+
+  <!-- Hidden YouTube player target -->
+  <div id="ytPlayer"></div>
+
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <script>
+  (function(){
+    // --- CONFIG: your video IDs here (in order) ---
+    const VIDEOS = [
+      "6uAnqAUodvA",
+      "7H2UVP7WVR0",
+      "-eJ8shv4-l4",
+      "GLdt1br1x8c",
+      "RLs2Mrk_nsU"
+    ];
+
+    // Simulation length (seconds)
+    const SIM_SECONDS = 300; // 5 minutes
+
+    // DOM
+    const startBtn = document.getElementById('startBtn');
+    const statusText = document.getElementById('statusText');
+    const progressFill = document.getElementById('progressFill');
+    const percentText = document.getElementById('percentText');
+
+    // YouTube player variables
+    let ytPlayer = null;
+    let ytReady = false;
+    let currentIndex = 0;
+    let started = false;
+
+    // Simulation variables
+    let simTimer = null;
+    let elapsed = 0;
+
+    // Create the YT player when API ready
+    window.onYouTubeIframeAPIReady = function() {
+      // Create a hidden player (0x0 size)
+      ytPlayer = new YT.Player('ytPlayer', {
+        height: '0',
+        width: '0',
+        playerVars: {
+          // avoid playlist embed; use single video loads
+          autoplay: 0,
+          controls: 0,
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1
+        },
+        events: {
+          'onReady': function(){ ytReady = true; console.log('YT ready'); },
+          'onStateChange': onPlayerStateChange,
+          'onError': onPlayerError
+        }
+      });
+    };
+
+    function playCurrentVideo() {
+      if (!ytReady || !ytPlayer) return;
+      const vid = VIDEOS[currentIndex];
+      // Load the video by id and play (muted to be safe)
+      try {
+        // mute -> load -> play. We start muted to avoid autoplay restrictions on some browsers.
+        ytPlayer.mute();
+        ytPlayer.loadVideoById({videoId: vid, startSeconds: 0, suggestedQuality: 'large'});
+        ytPlayer.playVideo();
+        statusText.textContent = `Playing (hidden) — video ${currentIndex+1}/${VIDEOS.length}`;
+      } catch (e) {
+        console.warn('play error', e);
+        statusText.textContent = 'Playback error — trying next';
+        scheduleNextVideo();
+      }
+    }
+
+    function scheduleNextVideo() {
+      // increment index then play; called when video ends or on error
+      currentIndex++;
+      if (currentIndex >= VIDEOS.length) currentIndex = 0;
+      // small delay to allow YT internal transitions
+      setTimeout(playCurrentVideo, 700);
+    }
+
+    function onPlayerStateChange(e) {
+      // YT states: -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering
+      if (e.data === YT.PlayerState.ENDED) {
+        scheduleNextVideo();
+      } else if (e.data === YT.PlayerState.PLAYING) {
+        // ensure muted (we start muted). If you want to unmute after user click, remove this.
+        // ytPlayer.unMute(); // <-- do not unmute automatically to keep autoplay-safe
+      }
+    }
+
+    function onPlayerError(e) {
+      console.error('YT player error', e);
+      // try to skip to next video
+      scheduleNextVideo();
+    }
+
+    // Simulation UI update
+    function updateSimUI() {
+      const pct = Math.floor((elapsed / SIM_SECONDS) * 100);
+      progressFill.style.width = pct + '%';
+      const remaining = Math.max(0, SIM_SECONDS - elapsed);
+      const mm = Math.floor(remaining/60).toString().padStart(2,'0');
+      const ss = (remaining%60).toString().padStart(2,'0');
+      percentText.textContent = `${pct}% — ${mm}:${ss} remaining`;
+      // ARIA value
+      document.querySelector('.progress-bar').setAttribute('aria-valuenow', String(pct));
+    }
+
+    function startSimulationAndPlayback() {
+      if (started) return;
+      started = true;
+
+      // Start playback (user gesture)
+      if (!ytReady) {
+        // API might not be ready yet; attempt after small delay
+        statusText.textContent = 'Initializing video player...';
+        const waitForReady = setInterval(() => {
+          if (ytReady) {
+            clearInterval(waitForReady);
+            playCurrentVideo();
+          }
+        }, 200);
+      } else {
+        playCurrentVideo();
+      }
+
+      // Start simulation timer
+      elapsed = 0;
+      updateSimUI();
+      statusText.textContent = 'Download started';
+      simTimer = setInterval(() => {
+        elapsed++;
+        updateSimUI();
+        if (elapsed >= SIM_SECONDS) {
+          clearInterval(simTimer);
+          progressFill.style.width = '100%';
+          percentText.textContent = '100% — 0:00 remaining';
+          statusText.textContent = 'Download complete';
+          // optional: stop video playback when download completes:
+          // if (ytPlayer && ytReady) { ytPlayer.pauseVideo(); }
+        }
+      }, 1000);
+    }
+
+    // Start button: start both sim and video (this click is the user gesture that allows playback)
+    startBtn.addEventListener('click', function(){
+      startSimulationAndPlayback();
+      // visually disable button to avoid repeat clicks
+      startBtn.disabled = true;
+      startBtn.style.opacity = 0.7;
+    });
+
+    // Accessibility: allow Enter key on focused button
+    startBtn.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        startBtn.click();
+      }
+    });
+
+    // Extra safety: if API fails to load, fallback to opening youtube in new tab as last resort
+    setTimeout(() => {
+      if (!ytReady) {
+        console.warn('YT API not ready; falling back might be needed.');
+        // Do nothing automatically; if user wants fallback we can implement opening tab, but kept silent to avoid surprise
+      }
+    }, 6000);
+
+  })();
+  </script>
+</body>
+</html>
