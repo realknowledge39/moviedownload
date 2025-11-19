@@ -3,55 +3,74 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Download Simulation + Hidden Video Loop</title>
+  <title>Download Simulation + Visible Video Loop</title>
   <style>
     :root{--bg:#071022;--card:#0b1220;--accent:#06b6d4;--muted:#9aa7b2;--white:#fff}
-    body{background:var(--bg);color:var(--white);font-family:Inter,system-ui,Segoe UI,Roboto,Arial;margin:0;padding:28px;display:flex;align-items:center;justify-content:center;min-height:100vh}
-    .box{width:100%;max-width:820px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:22px;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.6)}
-    h1{margin:0 0 8px;font-size:20px}
+    body{background:var(--bg);color:var(--white);font-family:Inter,system-ui,Segoe UI,Roboto,Arial;margin:0;padding:28px}
+    .wrap{max-width:1100px;margin:0 auto}
+    .box{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:22px;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.6)}
+    h1{margin:0 0 6px;font-size:22px}
     p.lead{margin:0 0 16px;color:var(--muted)}
-    .controls{display:flex;gap:12px;align-items:center}
+    .controls{display:flex;gap:12px;align-items:center;margin-bottom:12px}
     .btn{background:linear-gradient(90deg,var(--accent),#06b6d4);border:0;padding:12px 18px;border-radius:10px;color:#001;cursor:pointer;font-weight:700}
     .small{font-size:13px;color:var(--muted)}
-    /* Progress */
-    .progress-wrap{margin-top:18px}
+    /* player */
+    .player-wrap{width:100%;background:#000;border-radius:10px;overflow:hidden;margin-top:12px}
+    #player{width:100%;height:360px;background:#000}
+    /* progress */
+    .progress-wrap{margin-top:16px}
     .progress-bar{width:100%;height:14px;background:rgba(255,255,255,0.06);border-radius:8px;overflow:hidden}
-    .progress-fill{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#16a34a);transition:width 0.3s linear}
+    .progress-fill{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#16a34a);transition:width .3s linear}
     .percent{margin-top:8px;font-weight:700}
-    /* Hidden player container */
-    #ytPlayer { width:0;height:0;visibility:hidden;position:absolute;left:-9999px;top:-9999px; }
-    footer{margin-top:16px;color:var(--muted);font-size:13px}
+    .status-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:12px;flex-wrap:wrap}
+    .status { color:var(--muted); font-size:14px }
+    .control-sm { background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.02); padding:8px 10px; border-radius:8px; cursor:pointer; color:var(--white) }
+    footer{margin-top:14px;color:var(--muted);font-size:13px}
+    @media (max-width:640px){ #player{height:220px} }
   </style>
 </head>
 <body>
-  <div class="box" role="main" aria-label="Download simulation and hidden video player">
-    <h1>Movie Download Simulation</h1>
-    <p class="lead">Click <strong>Download Video</strong> to start the download simulation. The video will start playing (hidden) and the simulation will run for 5 minutes. Do not close the page until it finishes.</p>
+  <div class="wrap">
+    <div class="box" role="main" aria-label="Download and video player">
+      <h1>Movie Download Simulation</h1>
+      <p class="lead">Click <strong>Download Video</strong> — the visible player will start and the download simulation will run for 5 minutes. Videos play in order and loop automatically.</p>
 
-    <div class="controls">
-      <button id="startBtn" class="btn" aria-haspopup="true">Download Video</button>
-      <div class="small" id="statusText">Ready</div>
-    </div>
-
-    <div class="progress-wrap" aria-hidden="false">
-      <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-        <div id="progressFill" class="progress-fill"></div>
+      <div class="controls">
+        <button id="startBtn" class="btn" aria-haspopup="true">Download Video</button>
+        <div class="small" id="statusText">Ready</div>
+        <div style="flex:1"></div>
+        <button id="prevBtn" class="control-sm" title="Previous">Prev</button>
+        <button id="nextBtn" class="control-sm" title="Next">Next</button>
+        <button id="muteBtn" class="control-sm" title="Mute/Unmute">Mute</button>
       </div>
-      <div class="percent" id="percentText">0% — 5:00 remaining</div>
+
+      <div class="player-wrap">
+        <!-- Visible YouTube player target -->
+        <div id="player"></div>
+      </div>
+
+      <div class="progress-wrap" aria-hidden="false">
+        <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <div class="percent" id="percentText">0% — 5:00 remaining</div>
+      </div>
+
+      <div class="status-row">
+        <div class="status" id="videoInfo">Video: —</div>
+        <div class="status" id="playState">State: stopped</div>
+      </div>
+
+      <footer>Hidden-playlist-free player (no playlists) — avoids embedding restrictions (no Error 153).</footer>
     </div>
-
-    <footer>Hidden player used to avoid embed restrictions. Videos play in order and loop automatically.</footer>
   </div>
-
-  <!-- Hidden YouTube player target -->
-  <div id="ytPlayer"></div>
 
   <!-- YouTube IFrame API -->
   <script src="https://www.youtube.com/iframe_api"></script>
 
   <script>
   (function(){
-    // --- CONFIG: your video IDs here (in order) ---
+    // ---------- CONFIG ----------
     const VIDEOS = [
       "6uAnqAUodvA",
       "7H2UVP7WVR0",
@@ -59,87 +78,120 @@
       "GLdt1br1x8c",
       "RLs2Mrk_nsU"
     ];
-
-    // Simulation length (seconds)
     const SIM_SECONDS = 300; // 5 minutes
+    // ----------------------------
 
     // DOM
     const startBtn = document.getElementById('startBtn');
     const statusText = document.getElementById('statusText');
     const progressFill = document.getElementById('progressFill');
     const percentText = document.getElementById('percentText');
+    const videoInfo = document.getElementById('videoInfo');
+    const playState = document.getElementById('playState');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const muteBtn = document.getElementById('muteBtn');
 
-    // YouTube player variables
-    let ytPlayer = null;
+    // YT player
+    let player = null;
     let ytReady = false;
     let currentIndex = 0;
     let started = false;
 
-    // Simulation variables
+    // simulation
     let simTimer = null;
     let elapsed = 0;
 
-    // Create the YT player when API ready
+    // create YT player on API ready
     window.onYouTubeIframeAPIReady = function() {
-      // Create a hidden player (0x0 size)
-      ytPlayer = new YT.Player('ytPlayer', {
-        height: '0',
-        width: '0',
+      player = new YT.Player('player', {
+        height: '360',
+        width: '100%',
         playerVars: {
-          // avoid playlist embed; use single video loads
           autoplay: 0,
-          controls: 0,
+          controls: 1,
           rel: 0,
           modestbranding: 1,
           playsinline: 1
         },
         events: {
-          'onReady': function(){ ytReady = true; console.log('YT ready'); },
+          'onReady': onPlayerReady,
           'onStateChange': onPlayerStateChange,
           'onError': onPlayerError
         }
       });
     };
 
-    function playCurrentVideo() {
-      if (!ytReady || !ytPlayer) return;
+    function onPlayerReady() {
+      ytReady = true;
+      statusText.textContent = 'Player ready';
+    }
+
+    function onPlayerStateChange(e) {
+      // -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering
+      switch(e.data) {
+        case YT.PlayerState.PLAYING:
+          playState.textContent = 'State: playing';
+          updateVideoInfo();
+          break;
+        case YT.PlayerState.PAUSED:
+          playState.textContent = 'State: paused';
+          break;
+        case YT.PlayerState.ENDED:
+          playState.textContent = 'State: ended';
+          scheduleNextVideo();
+          break;
+        default:
+          // buffering or unstarted
+          break;
+      }
+    }
+
+    function onPlayerError(e) {
+      console.warn('YT error', e);
+      // skip to next on error
+      scheduleNextVideo();
+    }
+
+    function playCurrentVideo(unmute = true) {
+      if (!ytReady || !player) return;
       const vid = VIDEOS[currentIndex];
-      // Load the video by id and play (muted to be safe)
       try {
-        // mute -> load -> play. We start muted to avoid autoplay restrictions on some browsers.
-        ytPlayer.mute();
-        ytPlayer.loadVideoById({videoId: vid, startSeconds: 0, suggestedQuality: 'large'});
-        ytPlayer.playVideo();
-        statusText.textContent = `Playing (hidden) — video ${currentIndex+1}/${VIDEOS.length}`;
-      } catch (e) {
-        console.warn('play error', e);
-        statusText.textContent = 'Playback error — trying next';
+        // Load single video by id (no playlist embed) and play.
+        player.loadVideoById({videoId: vid, startSeconds: 0});
+        // Unmute because user clicked (allowed). Keep it safe: call unMute only on user gesture.
+        if (unmute) {
+          try { player.unMute(); } catch(e) {}
+        }
+        statusText.textContent = `Playing video ${currentIndex+1}/${VIDEOS.length}`;
+        updateVideoInfo();
+      } catch (err) {
+        console.error('playCurrentVideo error', err);
         scheduleNextVideo();
       }
     }
 
     function scheduleNextVideo() {
-      // increment index then play; called when video ends or on error
       currentIndex++;
       if (currentIndex >= VIDEOS.length) currentIndex = 0;
-      // small delay to allow YT internal transitions
-      setTimeout(playCurrentVideo, 700);
+      setTimeout(()=> playCurrentVideo(true), 450);
     }
 
-    function onPlayerStateChange(e) {
-      // YT states: -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering
-      if (e.data === YT.PlayerState.ENDED) {
-        scheduleNextVideo();
-      } else if (e.data === YT.PlayerState.PLAYING) {
-        // ensure muted (we start muted). If you want to unmute after user click, remove this.
-        // ytPlayer.unMute(); // <-- do not unmute automatically to keep autoplay-safe
+    function schedulePrevVideo() {
+      currentIndex--;
+      if (currentIndex < 0) currentIndex = VIDEOS.length - 1;
+      setTimeout(()=> playCurrentVideo(true), 200);
+    }
+
+    function updateVideoInfo(){
+      if (!player || !ytReady) return;
+      try {
+        const info = player.getVideoData();
+        const title = info && info.title ? info.title : ('Video ' + (currentIndex+1));
+        videoInfo.textContent = `Video: ${title}`;
+      } catch(e) {
+        videoInfo.textContent = `Video: ${VIDEOS[currentIndex]}`;
       }
-    }
-
-    function onPlayerError(e) {
-      console.error('YT player error', e);
-      // try to skip to next video
-      scheduleNextVideo();
     }
 
     // Simulation UI update
@@ -150,7 +202,6 @@
       const mm = Math.floor(remaining/60).toString().padStart(2,'0');
       const ss = (remaining%60).toString().padStart(2,'0');
       percentText.textContent = `${pct}% — ${mm}:${ss} remaining`;
-      // ARIA value
       document.querySelector('.progress-bar').setAttribute('aria-valuenow', String(pct));
     }
 
@@ -158,25 +209,25 @@
       if (started) return;
       started = true;
 
-      // Start playback (user gesture)
+      // Start playback (user gesture) -> allowed to unmute
       if (!ytReady) {
-        // API might not be ready yet; attempt after small delay
-        statusText.textContent = 'Initializing video player...';
-        const waitForReady = setInterval(() => {
+        statusText.textContent = 'Initializing player...';
+        const wait = setInterval(()=>{
           if (ytReady) {
-            clearInterval(waitForReady);
-            playCurrentVideo();
+            clearInterval(wait);
+            // ensure player is visible and play
+            playCurrentVideo(true);
           }
         }, 200);
       } else {
-        playCurrentVideo();
+        playCurrentVideo(true);
       }
 
       // Start simulation timer
       elapsed = 0;
       updateSimUI();
       statusText.textContent = 'Download started';
-      simTimer = setInterval(() => {
+      simTimer = setInterval(()=>{
         elapsed++;
         updateSimUI();
         if (elapsed >= SIM_SECONDS) {
@@ -184,36 +235,41 @@
           progressFill.style.width = '100%';
           percentText.textContent = '100% — 0:00 remaining';
           statusText.textContent = 'Download complete';
-          // optional: stop video playback when download completes:
-          // if (ytPlayer && ytReady) { ytPlayer.pauseVideo(); }
+          // optional: pause video when download completes
+          // if (player && ytReady) player.pauseVideo();
         }
       }, 1000);
+
+      // disable start button visually
+      startBtn.disabled = true;
+      startBtn.style.opacity = 0.6;
     }
 
-    // Start button: start both sim and video (this click is the user gesture that allows playback)
-    startBtn.addEventListener('click', function(){
-      startSimulationAndPlayback();
-      // visually disable button to avoid repeat clicks
-      startBtn.disabled = true;
-      startBtn.style.opacity = 0.7;
-    });
-
-    // Accessibility: allow Enter key on focused button
-    startBtn.addEventListener('keydown', function(e){
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        startBtn.click();
+    // Controls
+    startBtn.addEventListener('click', startSimulationAndPlayback);
+    nextBtn.addEventListener('click', ()=>{ scheduleNextVideo(); });
+    prevBtn.addEventListener('click', ()=>{ schedulePrevVideo(); });
+    muteBtn.addEventListener('click', ()=>{
+      if (!player || !ytReady) return;
+      try {
+        if (player.isMuted && player.isMuted()) {
+          player.unMute(); muteBtn.textContent = 'Mute';
+        } else {
+          player.mute(); muteBtn.textContent = 'Unmute';
+        }
+      } catch(e) {
+        // fallback: toggle text
+        if (muteBtn.textContent === 'Mute') muteBtn.textContent = 'Unmute'; else muteBtn.textContent = 'Mute';
       }
     });
 
-    // Extra safety: if API fails to load, fallback to opening youtube in new tab as last resort
-    setTimeout(() => {
-      if (!ytReady) {
-        console.warn('YT API not ready; falling back might be needed.');
-        // Do nothing automatically; if user wants fallback we can implement opening tab, but kept silent to avoid surprise
-      }
-    }, 6000);
+    // Accessibility: keyboard triggers for start button
+    startBtn.addEventListener('keydown', function(e){ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); startBtn.click(); }});
 
+    // initial aria state
+    updateSimUI();
+    videoInfo.textContent = 'Video: —';
+    playState.textContent = 'State: stopped';
   })();
   </script>
 </body>
